@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SDG 11 側邊欄貼合優化版</title>
+    <title>SDG 11 側邊欄全同步貼合版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --sdg11-color: #f99d26; --bg-color: #ffffff; }
-        /* 鎖定比例，確保貼合邊界且不產生捲軸 */
+        /* 鎖定全畫面比例，確保貼合邊界且無捲軸 */
         html, body { 
             margin: 0; padding: 0; 
             background-color: transparent; 
             font-family: "Microsoft JhengHei", sans-serif; 
-            width: 100%; height: 100%;
+            width: 100%; height: 100vh;
             overflow: hidden; 
         }
         
@@ -25,7 +25,7 @@
             box-sizing: border-box;
         }
 
-        /* 3x4 網格佈局 */
+        /* 3x4 網格佈局：撐滿視窗高度 */
         .dashboard-grid { 
             display: grid; 
             grid-template-columns: repeat(3, 1fr); 
@@ -45,19 +45,19 @@
             box-sizing: border-box;
             position: relative; 
             border: 1px solid #f0f0f0;
+            overflow: hidden;
         }
 
-        /* 標題字體調大，並設定自動換行 */
+        /* 標題字體顯著調大 */
         .card h3 { 
             margin: 0 0 3px 0;
             color: #333;
-            /* 調大字體以提升閱讀性 */
-            font-size: 12px; 
+            font-size: 14px; /* 調大字體 */
             line-height: 1.2;
-            padding-right: 35px; /* 預留給右上角按鈕的空間 */
+            padding-right: 35px; /* 預留給右上角標籤的空間 */
             white-space: normal;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 2; /* 最多兩行避免壓縮圖表 */
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
@@ -69,7 +69,7 @@
             position: relative;
         }
 
-        /* 詳細資訊按鈕：改為右上角淺灰色標籤樣式 */
+        /* 詳細資訊：右上角淺灰色標籤 */
         .info-btn { 
             position: absolute;
             top: 4px;
@@ -86,7 +86,7 @@
         }
         .info-btn:hover { background: #e0e0e0; }
 
-        /* 彈出視窗 */
+        /* 彈出視窗樣式 */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: white; margin: 10% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .modal-content h2 { font-size: 16px; margin-top: 0; color: var(--sdg11-color); border-bottom: 2px solid #eee; padding-bottom: 5px; }
