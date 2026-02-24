@@ -18,17 +18,35 @@
             overflow: hidden; 
         }
 
-        /* 左側年份選單：白色底、直式 */
+        /* 左側年份選單 */
         .sidebar { 
-            width: 180px; 
+            width: 220px; 
             background: white; 
             display: flex; 
             flex-direction: column; 
-            padding: 15px; 
+            padding: 0; 
             box-sizing: border-box; 
             border-right: 1px solid #ddd;
             box-shadow: 2px 0 5px rgba(0,0,0,0.05);
         }
+
+        /* Logo 樣式：加入滑鼠手勢提示可點擊 */
+        .sidebar-logo {
+            width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+            display: block;
+            cursor: zoom-in;
+            transition: opacity 0.3s;
+        }
+        .sidebar-logo:hover { opacity: 0.8; }
+
+        .sidebar-content {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
         .sidebar h2 { 
             font-size: 1.1rem; 
             text-align: center; 
@@ -38,6 +56,7 @@
             padding-bottom: 10px;
             margin-top: 0;
         }
+
         .year-item { 
             padding: 12px; 
             cursor: pointer; 
@@ -67,7 +86,6 @@
             box-sizing: border-box;
         }
 
-        /* 6欄 x 4列 矩陣 */
         .grid-container { 
             display: grid; 
             grid-template-columns: repeat(6, 1fr); 
@@ -77,7 +95,6 @@
             height: 100%; 
         }
 
-        /* 指標卡片 */
         .indicator-card { 
             background: white; 
             border-radius: 6px; 
@@ -117,23 +134,50 @@
         .sdg11-border { border-top-color: var(--sdg11-color); }
         .sdg12-border { border-top-color: var(--sdg12-color); }
 
-        /* 彈出視窗 */
+        /* 彈出視窗基礎樣式 */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px); }
         .modal-content { background: white; margin: 4vh auto; padding: 25px; border-radius: 12px; width: 85%; max-width: 950px; position: relative; }
         .close-btn { position: absolute; right: 20px; top: 15px; font-size: 28px; cursor: pointer; color: #999; }
         .canvas-container { width: 100%; height: 480px; margin-top: 15px; }
         .modal-info { background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 10px; font-size: 0.9rem; color: #555; line-height: 1.5; }
+
+        /* 圖片放大專用 Modal */
+        #imageModal .modal-content {
+            background: transparent;
+            box-shadow: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 90vh;
+            margin: 5vh auto;
+        }
+        #expandedImg {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <h2>請選擇年分</h2>
-    <div id="year-list"></div>
+    <img src="SDG11&12logo.png" alt="SDG Logo" class="sidebar-logo" onclick="openImageModal(this.src)">
+    
+    <div class="sidebar-content">
+        <h2>請選擇年分</h2>
+        <div id="year-list"></div>
+    </div>
 </div>
 
 <div class="main-content">
     <div class="grid-container" id="indicator-grid"></div>
+</div>
+
+<div id="imageModal" class="modal" onclick="this.style.display='none'">
+    <div class="modal-content">
+        <img id="expandedImg">
+    </div>
 </div>
 
 <div id="detailModal" class="modal">
@@ -155,7 +199,7 @@
     let currentYearIndex = 5; 
     let detailChart = null;
 
-    // 完整的 24 個指標資料
+    // 24 個指標資料
     const indicators = [
         {"id": "1", "type": "11", "name": "候車亭、公共空間無障礙比率", "unit": "%", "data": [10.0, 10.0, 32.0, 49.0, 61.5, 61.5], "agency": "臺東縣政府交通及養護工程處-交通管理科", "note": "候車亭、公共空間無障礙數量/ 候車亭、公共空間總數量"},
         {"id": "2", "type": "11", "name": "各年度大眾運輸系統載運量", "unit": "萬人次", "data": [112.79, 7.66, 9.35, 12.9085, 16.5366, 18.3792], "agency": "臺東縣政府交通及養護工程處-交通管理科", "note": "大眾運輸系統搭乘人次"},
@@ -227,6 +271,14 @@
         });
     }
 
+    // 圖片放大功能
+    function openImageModal(src) {
+        const modal = document.getElementById('imageModal');
+        const img = document.getElementById('expandedImg');
+        img.src = src;
+        modal.style.display = 'block';
+    }
+
     function openModal(ind) {
         const modal = document.getElementById('detailModal');
         document.getElementById('modal-title').innerText = ind.name;
@@ -239,7 +291,6 @@
         
         let config = {};
         if (ind.id === "37") {
-            // 針對項次 37 啟用雙 Y 軸
             config = {
                 labels: years,
                 datasets: [
@@ -299,7 +350,7 @@
                             position: 'right',
                             title: { display: true, text: '受傷人數', font: { weight: 'bold' } },
                             ticks: { color: '#3498db' },
-                            grid: { drawOnChartArea: false } // 防止右軸格線與左軸重疊
+                            grid: { drawOnChartArea: false } 
                         }
                     } : {})
                 }
@@ -308,7 +359,10 @@
     }
 
     function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
-    window.onclick = (e) => { if(e.target == document.getElementById('detailModal')) closeModal(); }
+    window.onclick = (e) => { 
+        if(e.target == document.getElementById('detailModal')) closeModal(); 
+        if(e.target == document.getElementById('imageModal')) e.target.style.display = 'none';
+    }
     init();
 </script>
 </body>
