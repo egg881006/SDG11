@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDG 11 側邊欄貼合優化版</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --sdg11-color: #f99d26; --bg-color: #ffffff; }
+        /* 鎖定比例，確保貼合邊界且不產生捲軸 */
+        html, body { 
+            margin: 0; padding: 0; 
+            background-color: transparent; 
+            font-family: "Microsoft JhengHei", sans-serif; 
+            width: 100%; height: 100%;
+            overflow: hidden; 
+        }
+        
+        .main-container { 
+            width: 100%; 
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 2px;
+            box-sizing: border-box;
+        }
+
+        /* 3x4 網格佈局 */
+        .dashboard-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            grid-template-rows: repeat(4, 1fr); 
+            gap: 4px; 
+            width: 100%;
+            height: 100%;
+        }
+
+        .card { 
+            background: white; 
+            border-radius: 4px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+            padding: 5px; 
+            display: flex; 
+            flex-direction: column; 
+            box-sizing: border-box;
+            position: relative; 
+            border: 1px solid #f0f0f0;
+        }
+
+        /* 標題字體調大，並設定自動換行 */
+        .card h3 { 
+            margin: 0 0 3px 0;
+            color: #333;
+            /* 調大字體以提升閱讀性 */
+            font-size: 12px; 
+            line-height: 1.2;
+            padding-right: 35px; /* 預留給右上角按鈕的空間 */
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .canvas-container { 
+            flex: 1; 
+            width: 100%;
+            min-height: 0; 
+            position: relative;
+        }
+
+        /* 詳細資訊按鈕：改為右上角淺灰色標籤樣式 */
+        .info-btn { 
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #f1f1f1; 
+            border: none; 
+            padding: 1px 5px; 
+            border-radius: 3px; 
+            cursor: pointer; 
+            font-size: 9px; 
+            color: #666;
+            transition: background 0.2s;
+            z-index: 10;
+        }
+        .info-btn:hover { background: #e0e0e0; }
+
+        /* 彈出視窗 */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 10% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-content h2 { font-size: 16px; margin-top: 0; color: var(--sdg11-color); border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        .modal-content p { font-size: 13px; line-height: 1.6; color: #444; }
+        .close { float: right; font-size: 20px; cursor: pointer; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="dashboard-grid" id="grid11"></div> 
+    </div>
+
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle"></h2>
+            <p><strong>主管機關：</strong><br><span id="modalAgency"></span></p>
+            <p><strong>指標備註：</strong><br><span id="modalNote"></span></p>
+        </div>
+    </div>
+
+    <script>
+        const indicators = [
+            {"id": "item_1", "name": "候車亭、公共空間無障礙比率", "unit": "%", "data": [10, 10, 32, 49, 61.5, 61.5], "agency": "臺東縣政府交通及養護工程處", "note": "無障礙數量 / 總數量", "color": "#f39c12"},
+            {"id": "item_2", "name": "各年度大眾運輸系統載運量", "unit": "萬人次", "data": [112.79, 7.66, 9.35, 12.91, 16.54, 18.38], "agency": "臺東縣政府交通及養護工程處", "note": "大眾運輸搭乘人次", "color": "#e67e22"},
+            {"id": "item_4", "name": "全齡友善人行步道", "unit": "公尺", "data": [79461, 81415, 82015, 82015, 82455, 82455], "agency": "臺東縣政府交通及養護工程處", "note": "改善道路兩旁人行道長度", "color": "#d35400"},
+            {"id": "item_5", "name": "人行道透水鋪面面積", "unit": "m²", "data": [1456655, 1462847, 1516847, 1516847, 1517375, 1517375], "agency": "臺東縣政府交通及養護工程處", "note": "本縣人行道透水鋪面總面積", "color": "#f1c40f"},
+            {"id": "item_6", "name": "身心障礙者自立生活人次", "unit": "人次", "data": [6292, 7387, 8304, 8646, 8204, 8751], "agency": "臺東縣政府社會處", "note": "身心障礙者服務使用人次", "color": "#e74c3c"},
+            {"id": "item_7", "name": "廢水處理人口比例", "unit": "%", "data": [15.19, 16.63, 18.13, 18.66, 19.59, 20.5], "agency": "臺東縣政府建設處", "note": "各類污水處理設施覆蓋率", "color": "#2980b9"},
+            {"id": "item_8", "name": "各年度污水系統接管率", "unit": "%", "data": [2.42, 3.42, 4.1, 4.09, 4.73, 5.64], "agency": "臺東縣政府建設處", "note": "公共污水下水道接管比率", "color": "#3498db"},
+            {"id": "item_9", "name": "各年度每人享有公園綠地面積", "unit": "公頃/萬人", "data": [7.98, 7.78, 8.01, 8, 8.33, 8.33], "agency": "臺東縣政府建設處", "note": "都市計畫區內已開闢面積比", "color": "#27ae60"},
+            {"id": "item_10", "name": "i-Tribe 建置數", "unit": "個", "data": [152, 170, 183, 187, 187, 187], "agency": "臺東縣政府原住民處", "note": "愛部落無線寬頻服務數量", "color": "#16a085"},
+            {"id": "item_26", "name": "住宅用火災警報器安置率", "unit": "%", "data": [54.8, 63.56, 80.8, 91.16, 97.34, 98.65], "agency": "臺東縣消防局", "note": "住警器設置戶數佔總戶數比", "color": "#c0392b"},
+            {"id": "item_37", "name": "高齡者交通事故傷亡人數", "unit": "人", "deathData": [15, 16, 24, 24, 15, 16], "injuryData": [797, 801, 883, 829, 812, 805], "agency": "臺東縣警察局", "note": "高齡者交通事故監測", "color": "#7f8c8d"},
+            {"id": "item_38", "name": "智慧交通號誌比率", "unit": "%", "data": [50.68, 68.61, 68.96, 59.3, 63.02, 63.15], "agency": "臺東縣警察局", "note": "市區交控中心管控數量比", "color": "#2c3e50"}
+        ];
+        
+        const years = ['109', '110', '111', '112', '113', '114'];
+        const charts = [];
+
+        const grid = document.getElementById('grid11');
+        indicators.forEach(ind => {
+            grid.innerHTML += `
+                <div class="card">
+                    <button class="info-btn" onclick="showInfo('${ind.name}', '${ind.agency}', '${ind.note}')">詳細資訊</button>
+                    <h3>${ind.name}</h3>
+                    <div class="canvas-container">
+                        <canvas id="canvas_${ind.id}"></canvas>
+                    </div>
+                </div>`;
+        });
+
+        function initCharts() {
+            indicators.forEach(ind => {
+                const ctx = document.getElementById(`canvas_${ind.id}`).getContext('2d');
+                let datasets = [];
+                const tickFontSize = 8; 
+
+                if (ind.id === 'item_37') {
+                    datasets = [
+                        { label: '死', data: ind.deathData, borderColor: '#e74c3c', borderWidth: 1.5, tension: 0.3, pointRadius: 1, yAxisID: 'yLeft' },
+                        { label: '傷', data: ind.injuryData, borderColor: '#3498db', borderWidth: 1.5, tension: 0.3, pointRadius: 1, yAxisID: 'yRight' }
+                    ];
+                } else {
+                    datasets = [{ 
+                        label: ind.unit, data: ind.data, borderColor: ind.color, borderWidth: 1.5, backgroundColor: ind.color + '15', fill: true, tension: 0.4, pointRadius: 0.5
+                    }];
+                }
+
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: years, datasets: datasets },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { display: ind.id !== 'item_37', ticks: { font: { size: tickFontSize } } },
+                            x: { ticks: { font: { size: tickFontSize } } },
+                            ...(ind.id === 'item_37' ? {
+                                yLeft: { type: 'linear', position: 'left', suggestedMax: 40, ticks: { font: { size: 7 }, color: '#e74c3c' } },
+                                yRight: { type: 'linear', position: 'right', suggestedMin: 700, suggestedMax: 1000, ticks: { font: { size: 7 }, color: '#3498db' }, grid: { drawOnChartArea: false } }
+                            } : {})
+                        }
+                    }
+                });
+                charts.push(chart);
+            });
+        }
+
+        window.onload = initCharts;
+
+        window.onresize = () => {
+            charts.forEach(chart => {
+                chart.resize();
+                chart.update();
+            });
+        };
+
+        function showInfo(title, agency, note) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalAgency').innerText = agency;
+            document.getElementById('modalNote').innerText = note || '暫無備註';
+            document.getElementById('infoModal').style.display = 'block';
+        }
+
+        function closeModal() { document.getElementById('infoModal').style.display = 'none'; }
+    </script>
+</body>
+</html>
