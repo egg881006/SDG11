@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臺東縣 SDG 11 & 12 全螢幕監測儀表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --sdg11-color: #f99d26; --sdg12-color: #cf8d2e; --bg-color: #f0f2f5; }
+        html, body { margin: 0; padding: 0; background-color: var(--bg-color); font-family: "Microsoft JhengHei", sans-serif; width: 100%; height: 100vh; display: flex; overflow: hidden; }
+        .sidebar { width: 220px; background: white; display: flex; flex-direction: column; padding: 0; box-sizing: border-box; border-right: 1px solid #ddd; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
+        .sidebar-logo { width: 100%; height: auto; margin-bottom: 10px; display: block; cursor: zoom-in; transition: opacity 0.3s; }
+        .sidebar-logo:hover { opacity: 0.8; }
+        .sidebar-content { padding: 15px; display: flex; flex-direction: column; }
+        .sidebar h2 { font-size: 1.1rem; text-align: center; margin-bottom: 20px; color: #333; border-bottom: 2px solid var(--sdg11-color); padding-bottom: 10px; margin-top: 0; }
+        .year-item { padding: 12px; cursor: pointer; transition: 0.2s; text-align: center; font-size: 1rem; margin-bottom: 8px; border-radius: 6px; background: #f8f9fa; color: #555; border: 1px solid #eee; }
+        .year-item:hover { background: #e9ecef; }
+        .year-item.active { background: var(--sdg11-color); color: white; font-weight: bold; border-color: var(--sdg11-color); }
+        .main-content { flex: 1; padding: 10px; display: flex; flex-direction: column; box-sizing: border-box; }
+        .grid-container { display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8px; width: 100%; height: 100%; }
+        .indicator-card { background: white; border-radius: 6px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; justify-content: center; border-top: 4px solid #ccc; position: relative; box-sizing: border-box; }
+        .indicator-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .card-title { font-size: 0.85rem; color: #444; line-height: 1.2; margin-bottom: 5px; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-value-container { display: flex; align-items: center; gap: 3px; }
+        .card-value { font-size: 1.4rem; font-weight: 800; color: #222; word-break: break-all; margin: 0; }
+        .card-unit { font-size: 0.75rem; color: #888; align-self: flex-end; margin-bottom: 2px; }
+        .trend-icon { font-size: 1.2rem; font-weight: 900; line-height: 1; margin-left: 5px; display: inline-block; text-shadow: 0.5px 0px 0px currentColor, -0.5px 0px 0px currentColor, 0px 0.5px 0px currentColor, 0px -0.5px 0px currentColor; transform: translateY(1px); }
+        .trend-up { color: #2ecc71; }
+        .trend-down { color: #e74c3c; }
+        .trend-stable { color: #f1c40f; display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #f1c40f; margin-left: 8px; box-shadow: 0 0 3px rgba(0,0,0,0.2); }
+        .tag { position: absolute; bottom: 5px; right: 8px; font-size: 0.6rem; color: #999; }
+        .sdg11-border { border-top-color: var(--sdg11-color); }
+        .sdg12-border { border-top-color: var(--sdg12-color); }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px); }
+        .modal-content { background: white; margin: 2vh auto; padding: 20px; border-radius: 12px; width: 85%; max-width: 950px; position: relative; max-height: 95vh; overflow-y: auto; }
+        .close-btn { position: absolute; right: 20px; top: 15px; font-size: 28px; cursor: pointer; color: #999; }
+        .canvas-container { width: 100%; height: 350px; margin-top: 15px; }
+        .gauge-wrap { width: 250px; height: 150px; margin: 0 auto; }
+        .modal-info { background: #f8f9fa; padding: 12px; border-radius: 6px; margin-top: 5px; font-size: 0.9rem; color: #333; line-height: 1.6; }
+        .chart-ctrl { text-align: center; margin: 10px 0; }
+        .btn-toggle { padding: 5px 15px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+        .btn-toggle.active { background: var(--sdg11-color); color: white; border-color: var(--sdg11-color); }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <img src="SDG11&12logo.png" alt="SDG Logo" class="sidebar-logo" onclick="openImageModal(this.src)">
+    <div class="sidebar-content">
+        <h2>請選擇年分</h2>
+        <div id="year-list"></div>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="grid-container" id="indicator-grid"></div>
+</div>
+
+<div id="imageModal" class="modal" onclick="this.style.display='none'">
+    <div class="modal-content"><img id="expandedImg" style="max-width:90%; max-height:90%; border-radius:8px;"></div>
+</div>
+
+<div id="detailModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h2 id="modal-title" style="margin:0 0 10px 0; border-bottom: 2px solid #eee; padding-bottom: 10px;"></h2>
+        <div class="modal-info">
+            <div><strong>主管機關：</strong><span id="modalAgency"></span></div>
+            <div><strong>備註：</strong><span id="modalNote"></span></div>
+        </div>
+        <div id="tourist-ctrl" class="chart-ctrl" style="display:none;">
+            <button class="btn-toggle active" onclick="updateTouristChart('year')">逐年顯示</button>
+            <button class="btn-toggle" onclick="updateTouristChart('month')">逐月對比</button>
+        </div>
+        <div id="gauge-container" class="gauge-wrap" style="display:none;">
+            <canvas id="gaugeChart"></canvas>
+        </div>
+        <div class="canvas-container">
+            <canvas id="detailChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    const years = ['109', '110', '111', '112', '113', '114'];
+    let currentYearIndex = 5; 
+    let detailChart = null;
+    let gaugeChart = null;
+    let activeIndicator = null;
+
+    const touristData = {
+        months: ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"],
+        tt_109: [825625, 647499, 382169, 436731, 412480, 781697, 1655177, 2103252, 850548, 959378, 686607, 592055],
+        gd_109: [14102, 9269, 9832, 12902, 15369, 38439, 77681, 74009, 54351, 40145, 6858, 4676],
+        tt_yearly: [10333218,5336813,8164565,8764231,15510650, 13673362],
+        gd_yearly: [357633,155378,319294,304804,253026,211728]
+    };
+
+    const indicators = [
+        {"id": "1", "type": "11", "name": "候車亭、公共空間無障礙比率", "unit": "%", "data": [10.0, 10.0, 32.0, 49.0, 61.5, 61.5], "agency": "臺東縣政府交通及養護工程處-交通管理科", "note": "候車亭、公共空間無障礙數量/ 候車亭、公共空間總數量", "isGauge": true},
+        {"id": "2", "type": "11", "name": "各年度大眾運輸系統載運量", "unit": "萬人次", "data": [112.79, 7.66, 9.35, 12.91, 16.54, 18.38], "agency": "臺東縣政府交通及養護工程處-交通管理科", "note": "大眾運輸系統搭乘人次"},
+        {"id": "4", "type": "11", "name": "全齡友善人行步道", "unit": "公尺", "data": [79461, 81415, 82015, 82015, 82455, 82455], "agency": "臺東縣政府交通及養護工程處-交通工程科", "note": "改善道路兩旁人行道長度( 公尺)"},
+        {"id": "5", "type": "11", "name": "人行道透水鋪面面積", "unit": "m²", "data": [1456655, 1462847, 1516847, 1516847, 1517375, 1517375], "agency": "臺東縣政府交通及養護工程處-交通工程科", "note": "本縣人行道透水鋪面總面積"},
+        {"id": "6", "type": "11", "name": "身心障礙者自立生活人次", "unit": "人", "data": [6292, 7387, 8304, 8646, 8204, 8751], "agency": "臺東縣政府社會處", "note": "身心障礙者服務使用人次"},
+        {"id": "7", "type": "11", "name": "廢水處理人口比例", "unit": "%", "data": [15.19, 16.63, 18.13, 18.66, 19.59, 20.5], "agency": "臺東縣政府建設處", "note": "設施覆蓋率", "isGauge": true},
+        {"id": "8", "type": "11", "name": "各年度污水系統接管率", "unit": "%", "data": [2.42, 3.42, 4.1, 4.09, 4.73, 5.64], "agency": "臺東縣政府建設處", "note": "下水道接管率"},
+        {"id": "9", "type": "11", "name": "各年度每人享有公園綠地面積", "unit": "公頃/萬人", "data": [7.98, 7.78, 8.01, 8.0, 8.33, 8.33], "agency": "臺東縣政府建設處", "note": "都市計畫區內已開闢公園綠地面積／都市計畫人口數"},
+        {"id": "10", "type": "11", "name": "i-Tribe 建置數", "unit": "個", "data": [152, 170, 183, 187, 187, 187], "agency": "臺東縣政府原住民族行政處", "note": "建置原住民族部落「愛部落i-Tribe」無線寬頻服務數量"},
+        {"id": "19", "type": "11", "name": "各年度自來水供應人口比率", "unit": "%", "data": [83.63, 84.56, 85.51, 85.92, 85.05, 83.9], "agency": "臺東縣政府財政及經濟發展處", "note": "（實際供水人數／供水區域總人口數）x 100%"},
+        {"id": "37", "type": "11", "name": "高齡者交通事故傷亡人數", "unit": "人", "deathData": [15, 16, 24, 24, 15, 16], "injuryData": [797, 801, 883, 829, 812, 805], "agency": "臺東縣警察局", "note": "採雙 Y 軸顯示：左軸為死亡數，右軸為受傷數"},
+        {"id": "38", "type": "11", "name": "智慧交通號誌比率", "unit": "%", "data": [50.68, 68.61, 68.96, 59.3, 63.02, 63.15], "agency": "臺東縣警察局", "note": "管控數量比率"},
+        {"id": "20", "type": "12", "name": "各年度推動節約用水節水量", "unit": "CMD", "data": [8.0, -3.0, 7.0, 3.2, 5.1, 11.1], "agency": "臺東縣政府財政及經濟發展處", "note": "各年推動節約用水之水量，CMD（立方公尺／日）"},
+        {"id": "21", "type": "12", "name": "廢棄漁網具回收量", "unit": "公斤", "data": [0.0, 31458, 35100, 60961, 0, 0], "agency": "臺東縣政府農業處", "note": "本縣廢棄漁( 網) 具回收總重量"},
+        {"id": "25", "type": "12", "name": "旅遊人次", "unit": "人", "data": touristData.tt_yearly, "agency": "臺東縣政府觀光發展處", "note": "每年至本縣觀光人次", "isTourist": true},
+        {"id": "26", "type": "11", "name": "住宅用火災警報器安置率", "unit": "%", "data": [54.8, 63.56, 80.8, 91.16, 97.34, 98.65], "agency": "臺東縣消防局", "note": "住警器設置比率"},
+        {"id": "27", "type": "12", "name": "每人每日垃圾產生量", "unit": "公斤", "data": [1.24, 1.28, 1.33, 1.35, 1.44, 2.83], "agency": "臺東縣環境保護局-廢管科", "note": "產生量統計"},
+        {"id": "28", "type": "12", "name": "垃圾回收率", "unit": "%", "data": [62.02, 61.5, 61.19, 61.44, 59.21, 62.49], "agency": "臺東縣環境保護局-廢管科", "note": "資源回收量／垃圾產生量"},
+        {"id": "29", "type": "12", "name": "資源回收率", "unit": "%", "data": [56.72, 56.07, 57.21, 56.2, 51.57, 51.54], "agency": "臺東縣環境保護局-水保科", "note": "資源回收量占比"},
+        {"id": "30", "type": "12", "name": "廚餘回收再利用率", "unit": "%", "data": [48.62, 42.83, 45.38, 58.48, 58.74, 86.62], "agency": "臺東縣環境保護局-廢管科", "note": "廚餘再利用量佔比"},
+        {"id": "31", "type": "12", "name": "各年度公部門綠色採購金額", "unit": "萬元", "data": [9209, 8437, 11471, 106488, 97683, 92671], "agency": "臺東縣環境保護局-綜計科", "note": "公部門採購金額"},
+        {"id": "34", "type": "12", "name": "各年度廢水回收再利用量-廢水", "unit": "CMD", "data": [3430, 5108, 7646, 314, 747, 727], "agency": "臺東縣環境保護局-水保科", "note": "CMD（立方公尺／日）"},
+        {"id": "35", "type": "12", "name": "各年度廢水回收再利用量-汙水", "unit": "CMD", "data": [3430, 5108, 7646, 3879, 7754, 11430], "agency": "臺東縣政府建設處-下水道科", "note": "CMD（立方公尺／日）"},
+        {"id": "36", "type": "12", "name": "各年度廢水回收再利用量(合計)", "unit": "CMD", "data": [3430, 5108, 7646, 4193, 8501, 12157], "agency": "環保局+建設處", "note": "合計回收量"}
+    ];
+
+    function init() { renderYearList(); renderGrid(); }
+    function renderYearList() {
+        const list = document.getElementById('year-list');
+        years.forEach((year, index) => {
+            const item = document.createElement('div');
+            item.className = `year-item ${index === currentYearIndex ? 'active' : ''}`;
+            item.innerText = `${year} 年`;
+            item.onclick = () => { currentYearIndex = index; document.querySelectorAll('.year-item').forEach(el => el.classList.remove('active')); item.classList.add('active'); renderGrid(); };
+            list.appendChild(item);
+        });
+    }
+    function renderGrid() {
+        const grid = document.getElementById('indicator-grid');
+        grid.innerHTML = '';
+        indicators.forEach(ind => {
+            let trendHtml = "";
+            if (currentYearIndex > 0) {
+                let cur = (ind.id === "37") ? (ind.deathData[currentYearIndex] + ind.injuryData[currentYearIndex]) : ind.data[currentYearIndex];
+                let pre = (ind.id === "37") ? (ind.deathData[currentYearIndex-1] + ind.injuryData[currentYearIndex-1]) : ind.data[currentYearIndex-1];
+                if (cur > pre) trendHtml = `<span class="trend-icon trend-up">↑</span>`;
+                else if (cur < pre) trendHtml = `<span class="trend-icon trend-down">↓</span>`;
+                else trendHtml = `<span class="trend-stable"></span>`;
+            }
+            let val = (ind.id === "37") ? `${ind.deathData[currentYearIndex]}死/${ind.injuryData[currentYearIndex]}傷` : ind.data[currentYearIndex].toLocaleString();
+            const card = document.createElement('div');
+            card.className = `indicator-card sdg${ind.type}-border`;
+            card.innerHTML = `<div class="card-title">${ind.name}</div><div class="card-value-container"><span class="card-value">${val}</span><span class="card-unit">${ind.id==="37"?"":ind.unit}</span>${trendHtml}</div><div class="tag">SDG ${ind.type}</div>`;
+            card.onclick = () => openModal(ind);
+            grid.appendChild(card);
+        });
+    }
+    function openModal(ind) {
+        activeIndicator = ind;
+        const modal = document.getElementById('detailModal');
+        document.getElementById('modal-title').innerText = ind.name;
+        document.getElementById('modalAgency').innerText = ind.agency;
+        document.getElementById('modalNote').innerText = ind.note || "暫無詳細備註";
+        modal.style.display = 'block';
+        document.getElementById('tourist-ctrl').style.display = ind.isTourist ? 'block' : 'none';
+        document.getElementById('gauge-container').style.display = ind.isGauge ? 'block' : 'none';
+        if (ind.isGauge) renderGauge(ind.data[currentYearIndex]);
+        updateMainChart('year');
+    }
+    function renderGauge(val) {
+        if (gaugeChart) gaugeChart.destroy();
+        gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+            type: 'doughnut',
+            data: { datasets: [{ data: [val, 100 - val], backgroundColor: ['#f99d26', '#eee'] }] },
+            options: { rotation: -90, circumference: 180, cutout: '70%', plugins: { tooltip: {enabled: false} } }
+        });
+    }
+    function updateTouristChart(mode) {
+        document.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        updateMainChart(mode);
+    }
+    function updateMainChart(mode) {
+        if (detailChart) detailChart.destroy();
+        const ctx = document.getElementById('detailChart').getContext('2d');
+        let labels = years, ds = [];
+        if (activeIndicator.isTourist && mode === 'month') {
+            labels = touristData.months;
+            ds = [{ label: '臺東縣', data: touristData.tt_109, borderColor: '#f99d26' }, { label: '綠島', data: touristData.gd_109, borderColor: '#3498db' }];
+        } else if (activeIndicator.isTourist) {
+            ds = [{ label: '臺東縣', data: touristData.tt_yearly, borderColor: '#f99d26' }, { label: '綠島', data: touristData.gd_yearly, borderColor: '#3498db' }];
+        } else if (activeIndicator.id === "37") {
+            ds = [{ label: '死亡', data: activeIndicator.deathData, borderColor: '#e74c3c', yAxisID: 'y' }, { label: '受傷', data: activeIndicator.injuryData, borderColor: '#3498db', yAxisID: 'y1' }];
+        } else {
+            ds = [{ label: activeIndicator.unit, data: activeIndicator.data, borderColor: '#f99d26' }];
+        }
+        detailChart = new Chart(ctx, { type: 'line', data: { labels, datasets: ds }, options: { responsive: true, maintainAspectRatio: false, scales: { y1: { position: 'right', display: activeIndicator.id === "37" } } } });
+    }
+    function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
+    init();
+</script>
+</body>
+</html>
