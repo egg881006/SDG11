@@ -16,7 +16,6 @@
         html, body { margin: 0; padding: 0; background-color: var(--bg-color); font-family: "Microsoft JhengHei", sans-serif; width: 100%; height: 100vh; display: flex; overflow: hidden; }
         .sidebar { width: 220px; background: white; display: flex; flex-direction: column; padding: 0; box-sizing: border-box; border-right: 1px solid #ddd; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
         
-        /* 修改 Logo 容器樣式 */
         .sidebar-logo-container { width: 100%; display: flex; flex-direction: column; padding: 0; }
         .sidebar-logo { width: 100%; height: auto; display: block; transition: opacity 0.3s; cursor: pointer; }
         .sidebar-logo:hover { opacity: 0.8; }
@@ -109,8 +108,8 @@
         months: ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"],
         tt_109: [825625, 647499, 382169, 436731, 412480, 781697, 1655177, 2103252, 850548, 959378, 686607, 592055],
         gd_109: [14102, 9269, 9832, 12902, 15369, 38439, 77681, 74009, 54351, 40145, 6858, 4676],
-        tt_yearly: [10333218,5336813,8164565,8764231,15510650, 13673362],
-        gd_yearly: [357633,155378,319294,304804,253026,211728]
+        tt_yearly: [10333218, 5336813, 8164565, 8764231, 15510650, 13688857],
+        gd_yearly: [357633, 155378, 319294, 304804, 253026, 211728]
     };
 
     const indicators = [
@@ -164,20 +163,16 @@
                 let pre = (ind.id === "37") ? (ind.deathData[currentYearIndex-1] + ind.injuryData[currentYearIndex-1]) : ind.data[currentYearIndex-1];
                 
                 if (ind.id === "37") {
-                    // 針對「高齡者交通事故」特別處理邏輯
                     if (cur > pre) {
-                        // 人數上升：標示紅色、上升箭頭
                         valueColor = "var(--down-color)";
                         trendHtml = `<svg class="trend-arrow" style="display:block; fill:var(--down-color);" viewBox="0 0 100 50" preserveAspectRatio="none"><polygon points="50,5 95,45 5,45" /></svg>`;
                     } else if (cur < pre) {
-                        // 人數減少：標示綠色、下降箭頭
                         valueColor = "var(--up-color)";
                         trendHtml = `<svg class="trend-arrow" style="display:block; fill:var(--up-color);" viewBox="0 0 100 50" preserveAspectRatio="none"><polygon points="5,5 95,5 50,45" /></svg>`;
                     } else {
                         trendHtml = `<span class="trend-stable"></span>`;
                     }
                 } else {
-                    // 一般指標邏輯（預設）
                     if (cur > pre) {
                         valueColor = "var(--up-color)";
                         trendHtml = `<svg class="trend-arrow" style="display:block; fill:var(--up-color);" viewBox="0 0 100 50" preserveAspectRatio="none"><polygon points="50,5 95,45 5,45" /></svg>`;
@@ -235,6 +230,10 @@
         if (detailChart) detailChart.destroy();
         const ctx = document.getElementById('detailChart').getContext('2d');
         let labels = years, ds = [];
+        
+        // 抓取目前指標的單位（針對 id 37 雙 Y 軸特別設為 '人'）
+        let displayUnit = activeIndicator.id === "37" ? "人" : activeIndicator.unit;
+
         if (activeIndicator.isTourist && mode === 'month') {
             labels = touristData.months;
             ds = [{ label: '臺東縣', data: touristData.tt_109, borderColor: '#f99d26' }, { label: '綠島', data: touristData.gd_109, borderColor: '#3498db' }];
@@ -245,7 +244,50 @@
         } else {
             ds = [{ label: activeIndicator.unit, data: activeIndicator.data, borderColor: '#f99d26' }];
         }
-        detailChart = new Chart(ctx, { type: 'line', data: { labels, datasets: ds }, options: { responsive: true, maintainAspectRatio: false, scales: { y1: { position: 'right', display: activeIndicator.id === "37" } } } });
+        
+        // 增加千分位及單位的圖表設定
+        detailChart = new Chart(ctx, { 
+            type: 'line', 
+            data: { labels, datasets: ds }, 
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    y: { 
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + ' ' + displayUnit;
+                            }
+                        }
+                    },
+                    y1: { 
+                        position: 'right', 
+                        display: activeIndicator.id === "37",
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + ' ' + displayUnit;
+                            }
+                        }
+                    } 
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y.toLocaleString() + ' ' + displayUnit;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            } 
+        });
     }
     function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
     function openImageModal(src) { document.getElementById('expandedImg').src = src; document.getElementById('imageModal').style.display = 'block'; }
